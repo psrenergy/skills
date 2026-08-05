@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "skills",
+  "owner": { "name": "PSR", "email": "rsampaio@psr-inc.com" },
+  "description": "PSR external Claude Code skills.",
+  "plugins": [
+    {
+      "name": "skills",
+      "source": "./",
+      "description": "PSR's shared external skills."
+    }
+  ]
+}
