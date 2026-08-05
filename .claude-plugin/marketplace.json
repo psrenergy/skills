@@ -1,13 +1,30 @@
 {
-  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "skills",
-  "owner": { "name": "PSR", "email": "rsampaio@psr-inc.com" },
-  "description": "PSR external Claude Code skills.",
+  "version": "1.0.0",
+  "description": "TODO",
+  "owner": {
+    "name": "Raphael Sampaio",
+    "email": "rsampaio@psr-inc.com"
+  },
   "plugins": [
     {
-      "name": "skills",
-      "source": "./",
-      "description": "PSR's shared external skills."
+      "name": "factory",
+      "description": "TODO",
+      "source": "./plugins/factory",
+      "category": "development"
+    },
+    {
+      "name": "psrio",
+      "description": "TODO",
+      "source": "./plugins/psrio",
+      "category": "development"
+    },
+    {
+      "name": "quiver",
+      "description": "TODO",
+      "source": "./plugins/quiver",
+      "category": "development"
     }
   ]
 }
