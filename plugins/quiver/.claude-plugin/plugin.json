@@ -1,5 +1,10 @@
 {
   "name": "quiver",
   "version": "1.0.0",
-  "description": "TODO"
+  "description": "Use Quiver DB, the schema-first SQLite wrapper for decision support models — typed scalars, vectors, sets, and time series across Julia, Python, JavaScript, Dart, C++, and Lua.",
+  "author": {
+    "name": "PSR",
+    "url": "https://github.com/psrenergy"
+  },
+  "repository": "https://github.com/psrenergy/skills"
 }

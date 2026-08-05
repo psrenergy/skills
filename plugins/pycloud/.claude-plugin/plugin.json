@@ -1,5 +1,10 @@
 {
   "name": "pycloud",
   "version": "1.0.0",
-  "description": "TODO"
+  "description": "Drive PSR Cloud from Python — authenticate, submit model cases, monitor execution, and retrieve results.",
+  "author": {
+    "name": "PSR",
+    "url": "https://github.com/psrenergy"
+  },
+  "repository": "https://github.com/psrenergy/skills"
 }
