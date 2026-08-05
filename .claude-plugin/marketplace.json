@@ -1,5 +1,5 @@
 {
-  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "skills",
   "version": "1.0.0",
   "description": "TODO",
@@ -18,6 +18,12 @@
       "name": "psrio",
       "description": "TODO",
       "source": "./plugins/psrio",
+      "category": "development"
+    },
+    {
+      "name": "pycloud",
+      "description": "TODO",
+      "source": "./plugins/pycloud",
       "category": "development"
     },
     {
