@@ -1,6 +1,6 @@
 ---
-name: TODO
-description: TODO
+name: dashboards
+description: Assemble PSRIO dashboards from charts — create tabs, nest them, set icons, collapse or disable them, push charts and markdown into tabs, then save the dashboard. Use when a script must present several charts together as a report rather than emit standalone plots.
 ---
 
 # Index

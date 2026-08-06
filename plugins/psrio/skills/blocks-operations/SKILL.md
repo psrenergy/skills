@@ -1,6 +1,6 @@
 ---
-name: TODO
-description: TODO
+name: blocks-operations
+description: Convert between the block and hourly representations of a PSRIO result series — aggregate blocks, select a single block, map blocks into hours, and map hours into blocks. Use when a script mixes series of different intra-stage resolutions, or when results must be reported per block or per hour.
 ---
 
 # Index

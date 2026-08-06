@@ -37,6 +37,12 @@ They return 0/1 indicator series, so they compose with arithmetic and feed
 
 ## Minus
 
+```lua
+circuit = Circuit();
+circuit_flow = circuit:load("cirflw");
+reversed_flow = -circuit_flow;
+```
+
 ## Absolute Value
 
 ```lua
@@ -47,7 +53,23 @@ abs_cirflw = cirflw:abs();
 
 ## Round
 
+```lua
+system = System();
+cmgdem = system:load("cmgdem");
+cmgdem_rounded = cmgdem:round(2);
+```
+
 ## Fill
+
+```lua
+thermal = Thermal();
+gerter = thermal:load("gerter");
+gerter_filled = gerter:fill(0);
+```
+
+TODO(psr): confirm what `fill` replaces — undefined/missing entries only, or
+every entry in the series. The two behaviours are not distinguishable from the
+signature and the difference is silent.
 
 ## Unit Conversion
 
@@ -111,6 +133,12 @@ spillage_proportion = safe_divide(spillage, (spillage + generation));
 
 ## Power
 
+```lua
+circuit = Circuit();
+circuit_flow = circuit:load("cirflw");
+squared_flow = circuit_flow ^ 2;
+```
+
 ## Equal to
 
 ```lua
@@ -161,7 +189,23 @@ circuit_greater_than_or_equal_the_max_charge = circuit_flow:abs():ge(circuit.cap
 
 ## And
 
+Both operands are 0/1 indicator series, normally produced by the comparison
+methods above.
+
+```lua
+circuit = Circuit();
+circuit_flow = circuit:load("cirflw");
+flowing_below_capacity = circuit_flow:gt(0) & circuit_flow:abs():lt(circuit.capacity);
+```
+
 ## Or
+
+```lua
+hydro = Hydro();
+spilled_outflow = hydro:load("qverti");
+turbined_outflow = hydro:load("qturbi");
+releasing_water = spilled_outflow:gt(0) | turbined_outflow:gt(0);
+```
 
 ## Maximum
 

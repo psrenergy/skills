@@ -1,6 +1,6 @@
 ---
-name: TODO
-description: TODO
+name: agents-operations
+description: Select, aggregate, remove, rename, and concatenate agents within a PSRIO result series — by name, index, code, regex, query, or membership in another collection. Use when a script must narrow a series to specific plants, buses, or circuits, total agents into one label, relabel them for a chart legend, or aggregate by topology.
 ---
 
 # Index
@@ -9,7 +9,7 @@ description: TODO
 --[[Aggregate All Agents]] exp = exp1:aggregate_agents(f, label)
 --[[Aggregate Agents into Collection]] exp = exp1:aggregate_agents(f,  collection)
 --[[Select One Agent by Name or Index]] exp = exp1:select_agent(name or index)
---[[Select Mulitple Agents by Names or Indices]] exp = exp1:select_agents({name or index, name or index, ...})
+--[[Select Multiple Agents by Names or Indices]] exp = exp1:select_agents({name or index, name or index, ...})
 --[[Select Agents within a Collection]] exp = exp1:select_agents(collection)
 --[[Select Agents within a Collection Element]] exp = exp1:select_agents(collection, name)
 --[[Select Agents with a Query]] exp = exp1:select_agents(query)
@@ -17,13 +17,13 @@ description: TODO
 --[[Select Agent by Code]] exp = exp1:select_agent_by_code(code)
 --[[Select Agents by Code]] exp = exp1:select_agents_by_code({code, code, ...})
 --[[Remove One Agent by Name or Index]] exp = exp1:remove_agent(name or index)
---[[Remove Mulitple Agents by Names or Indices]] exp = exp1:remove_agents({name or index, name or index, ...})
+--[[Remove Multiple Agents by Names or Indices]] exp = exp1:remove_agents({name or index, name or index, ...})
 --[[Rename One Agent]] exp = exp1:rename_agent(name)
---[[Rename Mulitple Agents with One Name]] exp = exp1:rename_agents(name)
---[[Rename Mulitple Agents with Mutiple Names]] exp = exp1:rename_agents({name, name, ...})
---[[Rename Mulitple Agents by Adding a Suffix]] exp = exp1:add_suffix(suffix)
---[[Rename Mulitple Agents by Adding a Prefix]] exp = exp1:add_prefix(prefix)
---[[Concatenate Agents]] exp = concatenate({ exp1,  exp2, ...})
+--[[Rename Multiple Agents with One Name]] exp = exp1:rename_agents(name)
+--[[Rename Multiple Agents with Multiple Names]] exp = exp1:rename_agents({name, name, ...})
+--[[Rename Multiple Agents by Adding a Suffix]] exp = exp1:add_suffix(suffix)
+--[[Rename Multiple Agents by Adding a Prefix]] exp = exp1:add_prefix(prefix)
+--[[Concatenate Agents]] exp = concatenate(exp1, exp2, ...)
 --[[Aggregate Topology]] exp = exp1:aggregate_topology(f,  topology)
 --[[Aggregate Topology with Min and Max Levels]] exp = exp1:aggregate_topology(f,  topology,  min,  max)
 --[[Replace]] exp = exp1:replace(exp2)
@@ -59,7 +59,7 @@ gerter_t1 = gerter:select_agent("Thermal 1");
 gerter_t2 = gerter:select_agent(2);
 ```
 
-## Select Mulitple Agents by Names or Indices
+## Select Multiple Agents by Names or Indices
 
 ```lua
 thermal = Thermal();
@@ -112,8 +112,9 @@ agent = gerter:select_agent_by_code("1");
 ```lua
 thermal = Thermal();
 gerter = thermal:load("gerter");
-agents = gerter:select_agent_by_code({"1","2"});
+agents = gerter:select_agents_by_code({"1","2"});
 ```
+
 ## Remove One Agent by Name or Index
 
 ```lua
@@ -123,7 +124,7 @@ gerter_t2_and_t3 = gerter:remove_agent("Thermal 1");
 gerter_t1_and_t2 = gerter:remove_agent(3);
 ```
 
-## Remove Mulitple Agents by Names or Indices
+## Remove Multiple Agents by Names or Indices
 
 ```lua
 thermal = Thermal();
@@ -133,9 +134,23 @@ gerter_t1 = gerter:remove_agents({"Thermal 2", 3});
 
 ## Rename One Agent
 
-## Rename Mulitple Agents with One Name
+```lua
+thermal = Thermal();
+gerter = thermal:load("gerter"):select_agent(1);
+gerter_renamed = gerter:rename_agent("T1");
+```
 
-## Rename Mulitple Agents with Mutiple Names
+## Rename Multiple Agents with One Name
+
+Every agent in the series takes the same label.
+
+```lua
+thermal = Thermal();
+gerter = thermal:load("gerter");
+gerter_renamed = gerter:rename_agents("Thermal");
+```
+
+## Rename Multiple Agents with Multiple Names
 
 ```lua
 thermal = Thermal();
@@ -143,9 +158,21 @@ gerter = thermal:load("gerter");
 gerter_renamed = gerter:rename_agents({"T1", "T2", "T3"});
 ```
 
-## Rename Mulitple Agents by Adding a Suffix
+## Rename Multiple Agents by Adding a Suffix
 
-## Rename Mulitple Agents by Adding a Prefix
+```lua
+thermal = Thermal();
+gerter = thermal:load("gerter");
+gerter_labelled = gerter:add_suffix(" - Thermal");
+```
+
+## Rename Multiple Agents by Adding a Prefix
+
+```lua
+thermal = Thermal();
+gerter = thermal:load("gerter");
+gerter_labelled = gerter:add_prefix("Thermal - ");
+```
 
 ## Concatenate Agents
 

@@ -1,6 +1,6 @@
 ---
-name: TODO
-description: TODO
+name: saving
+description: Write a PSRIO result series to disk — `save` in BIN/HDR, CSV, or DAT, `save_and_load` to keep using the series afterwards, and `save_cache` for reuse within a run. Use when a script must emit output files or when you need the option table that controls the output format.
 ---
 
 # Index

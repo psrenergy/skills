@@ -1,6 +1,6 @@
 ---
-name: TODO
-description: TODO
+name: charts
+description: Build PSRIO charts from result series — line, spline, column, area (plain, stacked, percent, range), error bar, pie, histogram, heatmap, scatter, and probability of exceedance, with titles and categories. Use when a script must plot results or when you need the right `chart:add_*` call for a given plot type.
 ---
 
 # Index

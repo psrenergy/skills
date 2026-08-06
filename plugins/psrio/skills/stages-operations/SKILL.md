@@ -1,6 +1,6 @@
 ---
-name: TODO
-description: TODO
+name: stages-operations
+description: Aggregate, select, reshape, and concatenate the time dimension of a PSRIO result series — aggregate stages into weekly, monthly, or yearly profiles, pick a stage or year range, reset or uncouple stages, and set the initial stage or year. Use when a script must change the time resolution of results or restrict them to a period.
 ---
 
 # Index
@@ -16,7 +16,7 @@ description: TODO
 --[[Select Stages by a Year]] exp = exp1:select_stages_by_year(year)
 --[[Reshape Stages]] exp = exp1:reshape_stages(Profile.DAILY)
 --[[Reset Stages]] exp = exp1:reset_stages()
---[[Concatenate Stages]] exp = concatenate_stages({ exp1,  exp2, ...})
+--[[Concatenate Stages]] exp = concatenate_stages(exp1, exp2, ...)
 --[[Set Initial Stage]] exp = exp1:set_initial_stage(initial_stage)
 --[[Set Initial Year]] exp = exp1:set_initial_year(initial_year)
 --[[Uncouple Stages]] exp = exp1:uncouple_stages()
@@ -25,7 +25,13 @@ description: TODO
 
 ## Aggregate Stages
 
+Collapses the whole horizon into a single stage. Equivalent to passing
+`Profile.STAGE`, which is the default.
+
 ```lua
+system = System();
+defcit = system:load("defcit");
+defcit_total = defcit:aggregate_stages(BY_SUM());
 ```
 
 ## Aggregate Stages into a Profile
@@ -108,6 +114,14 @@ system = System();
 cmgdem = system:load("cmgdem");
 cmgdem_agg = cmgdem:aggregate_stages(BY_AVERAGE(), Profile.PER_MONTH);
 ```
+
+### Profile.QUARTER and Profile.PER_QUARTER
+
+TODO(psr): `Profile.QUARTER` and `Profile.PER_QUARTER` appear in the profiles
+table above but are the only two with no section. By analogy with the week and
+month cases, `QUARTER` should aggregate each position within a quarter across
+the horizon and `PER_QUARTER` should aggregate each quarter into one value —
+confirm, and document which source resolutions are valid.
 
 ### Profile.YEAR and Profile.PER_YEAR
 

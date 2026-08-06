@@ -1,6 +1,6 @@
 ---
-name: TODO
-description: TODO
+name: scenarios-operations
+description: Aggregate, select, remove, and concatenate scenarios of a PSRIO result series — average or percentile across scenarios, pick one or a range, drop scenarios, or splice several into one series. Use when a script must collapse the stochastic dimension (mean, P90, CVaR) or compare individual scenarios side by side.
 ---
 
 # Index
@@ -9,11 +9,10 @@ description: TODO
 --[[Aggregate Scenarios]] exp = exp1:aggregate_scenarios(f)
 --[[Aggregate Selected Scenarios]] exp = exp1:aggregate_scenarios(f, { scenario,  scenario, ...})
 --[[Select One Scenario]] exp = exp1:select_scenario(scenario)
---[[Select One Scenario]] exp = exp1:select_scenario(scenario)
 --[[Select Multiple Scenarios]] exp = exp1:select_scenarios({ scenario,  scenario, ...})
 --[[Select Scenarios Range]] exp = exp1:select_scenarios(from_scenario,  to_scenario)
 --[[Remove Multiple Scenarios]] exp = exp1:remove_scenarios({ scenario,  scenario, ...})
---[[Concatenate Scenarios]] exp = concatenate_scenarios({ exp1,  exp2, ...})
+--[[Concatenate Scenarios]] exp = concatenate_scenarios(exp1, exp2, ...)
 ```
 
 ## Aggregate Scenarios
@@ -44,16 +43,27 @@ cmgdem_scenario32 = cmgdem:select_scenario(32);
 ## Select Multiple Scenarios
 
 ```lua
+system = System();
+cmgdem = system:load("cmgdem");
+cmgdem_selected = cmgdem:select_scenarios({1, 7, 32});
 ```
 
 ## Select Scenarios Range
 
+Two arguments instead of a table — the range is inclusive of both ends.
+
 ```lua
+system = System();
+cmgdem = system:load("cmgdem");
+cmgdem_first_ten = cmgdem:select_scenarios(1, 10);
 ```
 
 ## Remove Multiple Scenarios
 
 ```lua
+system = System();
+cmgdem = system:load("cmgdem");
+cmgdem_without_outliers = cmgdem:remove_scenarios({3, 18});
 ```
 
 ## Concatenate Scenarios

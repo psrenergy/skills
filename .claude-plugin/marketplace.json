@@ -7,22 +7,13 @@
     "email": "rsampaio@psr-inc.com",
     "url": "https://github.com/psrenergy"
   },
+  "renames": {
+    "skills": "psrio"
+  },
   "plugins": [
-    {
-      "name": "factory",
-      "source": "./plugins/factory"
-    },
     {
       "name": "psrio",
       "source": "./plugins/psrio"
-    },
-    {
-      "name": "pycloud",
-      "source": "./plugins/pycloud"
-    },
-    {
-      "name": "quiver",
-      "source": "./plugins/quiver"
     }
   ]
 }
