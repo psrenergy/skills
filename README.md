@@ -11,17 +11,6 @@ A Claude Code plugin marketplace for PSR's energy modeling tools.
 
 Then `/plugin marketplace update skills` to pull new skills as they land.
 
-## Plugins
-
-| Plugin | What it covers |
-| --- | --- |
-| `psrio` | PSRIO Lua scripts for post-processing model results |
-
-Plugins for `factory` (study data C API and Python binding), `pycloud` (PSR Cloud
-from Python) and `quiver` (Quiver DB) exist under `plugins/` but ship no skills
-yet, so they are not listed in the marketplace. Add a `{ "name", "source" }`
-entry to `.claude-plugin/marketplace.json` when the first skill for one lands.
-
 ## Add a skill
 
 ```
