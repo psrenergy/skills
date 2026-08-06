@@ -43,7 +43,8 @@ cmgdem_scenario32 = cmgdem:select_scenario(32);
 
 ## Select Multiple Scenarios
 
-
+```lua
+```
 
 ## Select Scenarios Range
 

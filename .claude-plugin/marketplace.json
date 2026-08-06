@@ -1,7 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "skills",
-  "version": "1.0.0",
   "description": "Claude Code plugins for PSR's energy modeling tools — PSRIO, Quiver, PyCloud, and Factory.",
   "owner": {
     "name": "PSR",
@@ -11,27 +10,19 @@
   "plugins": [
     {
       "name": "factory",
-      "description": "Work with PSR Factory study data — the C API and Python binding for managing study databases.",
-      "source": "./plugins/factory",
-      "category": "development"
+      "source": "./plugins/factory"
     },
     {
       "name": "psrio",
-      "description": "Write PSRIO Lua scripts to post-process energy model results — loading result series, arithmetic and comparison operators, and aggregation.",
-      "source": "./plugins/psrio",
-      "category": "development"
+      "source": "./plugins/psrio"
     },
     {
       "name": "pycloud",
-      "description": "Drive PSR Cloud from Python — authenticate, submit model cases, monitor execution, and retrieve results.",
-      "source": "./plugins/pycloud",
-      "category": "development"
+      "source": "./plugins/pycloud"
     },
     {
       "name": "quiver",
-      "description": "Use Quiver DB, the schema-first SQLite wrapper for decision support models — typed scalars, vectors, sets, and time series across Julia, Python, JavaScript, Dart, C++, and Lua.",
-      "source": "./plugins/quiver",
-      "category": "development"
+      "source": "./plugins/quiver"
     }
   ]
 }

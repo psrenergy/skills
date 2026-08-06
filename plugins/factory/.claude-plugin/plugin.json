@@ -1,6 +1,5 @@
 {
   "name": "factory",
-  "version": "1.0.0",
   "description": "Work with PSR Factory study data — the C API and Python binding for managing study databases.",
   "author": {
     "name": "PSR",

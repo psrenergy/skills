@@ -1,6 +1,5 @@
 {
   "name": "pycloud",
-  "version": "1.0.0",
   "description": "Drive PSR Cloud from Python — authenticate, submit model cases, monitor execution, and retrieve results.",
   "author": {
     "name": "PSR",
