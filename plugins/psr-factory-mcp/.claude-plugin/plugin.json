@@ -1,0 +1,10 @@
+{
+  "name": "psr-factory-mcp",
+  "description": "Analyst workflow guide for the PSR Factory MCP server — query, edit, run, and analyze SDDP cases through natural language. Requires the psr-factory-mcp server (pip install psr-factory-mcp) to be configured in the assistant.",
+  "author": {
+    "name": "PSR",
+    "url": "https://github.com/psrenergy"
+  },
+  "homepage": "https://pypi.org/project/psr-factory-mcp/",
+  "repository": "https://github.com/psrenergy/skills"
+}

@@ -14,6 +14,10 @@
     {
       "name": "psrio",
       "source": "./plugins/psrio"
+    },
+    {
+      "name": "psr-factory-mcp",
+      "source": "./plugins/psr-factory-mcp"
     }
   ]
 }
