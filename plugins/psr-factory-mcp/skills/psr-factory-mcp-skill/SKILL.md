@@ -3,7 +3,10 @@ name: psr-factory-mcp-skill
 description: >
   Comprehensive PSR/SDDP analyst workflow guide — always use this skill for
   anything involving a PSR or SDDP case. Covers all MCP tools with
-  full descriptions, combination patterns, and worked examples.
+  full descriptions, combination patterns, and worked examples. Actions on a
+  case always use the MCP tools; only complex logic they cannot express is
+  delegated to a script written with the psr-factory skill
+  (writing-psr-factory-scripts).
 
   Trigger whenever the user: mentions PSR, SDDP, OptGen, or provides any
   case path (e.g. "C:/PSR/case", "D:/studies/run_01");  asks to explore;  queries input
@@ -37,6 +40,36 @@ Do NOT call any other tool before the setup call completes successfully.
 - For run questions: call `list_available_versions('sddp')` instead.
 
 **Step 3 — Execute the goal using the keys and property names obtained above.**
+
+---
+
+## 0. Tools first — scripts only for complex work
+
+**Every action on a case goes through the psr-factory-mcp tools**: discovery,
+queries, edits, runs, output analysis. Do not write a script for anything a
+tool already does.
+
+Switch to a script **only** when the task needs logic the tools cannot express,
+for example: conditional edits over many objects, bulk creation/cloning with
+cross-references, time series computed from several properties, resampling,
+or custom manipulation of study files. In that case:
+
+1. **Load the `writing-psr-factory-scripts` skill** (the PSR Factory skill,
+   installed with `psr-factory skills`). Follow its API rules — do not guess
+   `psr.factory` calls. If the skill is not available, ask the user to run
+   `psr-factory skills` in the project and stop.
+2. **Write a standalone Python script** that loads the case, applies the change
+   and saves. Always target a **copy** of the case, never the original (same
+   rule as `setup_edit_study`), unless the user explicitly approves in-place.
+3. **Run it with Bash** (`python script.py`). There is no MCP tool for running
+   scripts.
+4. **Verify with MCP tools**: the server keeps its own loaded study, so after a
+   script changes a case on disk call `setup_input_study(<copy>)` again, then
+   check the result with `get_*` / `query_*` / `input_*` tools. Run the model
+   with `run_psr_model` if requested.
+
+Decision rule: if one or a few tool calls can do it → tools. If you would need
+to loop with branching logic or the tool catalog has no equivalent → script.
 
 ---
 
@@ -173,8 +206,21 @@ at the bottom of the result. Never guess `.BIN` names. Requires `setup_input_stu
 | `get_dataframe_schema(key, prop)` | Inspect shape before editing | — |
 | `set_dataframe(key, df_dict)` | Replace full DataFrame | get_dataframe_schema first |
 | `scale_dataframe(key, prop, pct)` | Scale all values by % | — |
+| `clear_dataframe(key, prop, date=None)` | Drop all entries of a dynamic property, or only the one at `date` | — |
+| `remove_elements(keys, cascade=False)` | Remove objects; refused while required references exist | — |
+| `replace_references(old_key, new_key)` | Re-point every reference to `old_key` onto `new_key` | Both objects exist |
 | `create_element(type, name, ...)` | Create new object | — |
 | `modify_study_setting(prop, val)` | Study-level settings | — |
+
+**Removing an object:** `remove_elements` refuses (and removes nothing) while
+another object holds the target as a *required* reference; the error lists them.
+Choose explicitly:
+- the referrers should go too → `remove_elements(keys, cascade=True)`;
+- the referrers should stay, pointing elsewhere → `replace_references(old, new)`
+  first, then `remove_elements([old])`.
+Never use `cascade=True` without telling the user which objects were also removed
+(the result lists them). Children of the object (a HydroPlant's generators, a
+Demand's segments) are removed with it automatically.
 
 **Static vs dynamic — how to tell:** call `discover_object_properties`. Look for
 `"Static (does not vary with time)"` → use `modify_static_element`.
@@ -799,6 +845,7 @@ input_filter_binary_dataframe_by_index('GHIDR.BIN', {"year": [2027]})
 
 ## 5. Orchestration rules
 
+0. **Tools first, scripts last.** Use MCP tools for every case action. Only for complex logic the tools cannot express: load `writing-psr-factory-scripts`, write a `psr.factory` script that works on a copy of the case, run it with Bash, then re-load the copy with `setup_input_study` and verify with tools (see section 0).
 1. **No activation step.** Every MCP tool is callable directly. `find_tools(query)` is optional — use it only to discover tool names you don't know.
 2. **Two-step discovery:** `discover_objects()` → pick exact type → `discover_object_properties(type)` → get properties + keys + binary files. Reuse results within a session.
 3. **Prefer targeted tools over broad ones:**
@@ -809,6 +856,7 @@ input_filter_binary_dataframe_by_index('GHIDR.BIN', {"year": [2027]})
 5. **Always use exact keys:** `"ThermalPlant Gas1 [3]"` — never just `"Gas1"`.
 6. **Edits always on a copy:** use `setup_edit_study`, not `setup_edit_study_inplace`, unless user explicitly approves: when you set another folder you should discover all objects again to use the correct obj_key.
 7. **`get_dataframe_schema` is mandatory** before `set_dataframe` — shape must match exactly.
+7a. **Removals are destructive:** confirm the object keys with the user, run on the safe copy, and prefer `replace_references` + `remove_elements` over `cascade=True` unless the user wants the dependents deleted.
 8. **Binary file names come from `discover_object_properties`** — look for "Binary Input Files" at the bottom of the result.
 9. **`df_info` first** on any unfamiliar output file before `df_aggregate`, `df_filter_*`, etc. — exact index level names and column names are required by every other `df_*` tool.
 9a. **`df_aggregate` `'mean'` is UNWEIGHTED by default** — every collapsed row counts equally. Whenever the levels being collapsed include blocks, that is not the time-weighted average the user almost certainly means, because blocks have different durations. Pass `weights_file=<block-duration output file>` for the correct figure; the weights are joined on the index levels the two files share. Every result carries a `weighting` key — read it and state plainly which mean you are reporting. Never present an unweighted block average as "the average" without saying so.
