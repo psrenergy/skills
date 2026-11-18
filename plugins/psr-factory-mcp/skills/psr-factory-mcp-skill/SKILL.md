@@ -199,12 +199,11 @@ not run past the period. Rows are the dates the study stores; `expand=True` give
 | Tool | Purpose | Combine with |
 |------|---------|-------------|
 | `discover_objects(query?)` | Type names with one-line descriptions (no study needed) | Always first when unsure of type |
-| `discover_object_properties(type, query?)` | Description, properties (unit, static/dynamic, key columns), references, who references the type; with a study: keys, tables, binary files | After discover_objects |
+| `discover_object_properties(type or [types], query?)` | Description, properties (unit, static/dynamic, key columns), references, who references the type; with a study: keys, tables, binary files | After discover_objects |
 | `list_tables(type)` | Tables of a type (static, by_stage, by_stage_block, by_hour, by_window…), key columns and properties | discover_object_properties |
 | `get_objects_by_type(type)` | All object keys + count for a type | discover_objects |
 | `get_all_objects()` | Full catalog (key → type map) | Use sparingly |
-| `get_object_summary(key)` | All statics + references for one object | get_neighbors |
-| `get_neighbors(key, depth)` | Relationship graph | get_object_summary |
+| `get_neighbors(key, depth)` | Relationship graph around one object | get_objects_by_type |
 
 ### 2C. Query tools
 
@@ -212,7 +211,8 @@ not run past the period. Rows are the dates the study stores; `expand=True` give
 |------|---------|----------------|
 | `get_static_properties(key, props)` | Specific scalar fields | `properties_names: list[str]` |
 | `get_dynamic_property(key, prop)` | Time-series as string | Quick inspection only |
-| `get_objects_table(type, props)` | Table for all objects of a type | Best for comparisons |
+| `get_objects_table({type: [props]})` | Static properties of all objects, several types at once | Prefer `get_table` for filters/aggregations |
+| `get_grouped_properties_table(key, prop)` | A family of related dynamic properties (e.g. Max/MinGenerationCapacity) in one table | One element |
 
 ### 2D. Filter & Aggregate tools
 
@@ -379,6 +379,7 @@ aggregating.
 | `run_psr_model(path, model, version)` | Start simulation in background — returns `job_id` immediately |
 | `get_run_status(job_id)` | Poll a running job: `'running'` / `'completed'` / `'failed'` |
 | `read_run_log(job_id)` | Parse log: outcome, errors, warnings, convergence, last N lines |
+| `kill_run(job_id)` | Stop a running job (confirm with the user first) |
 
 **Typical flow:**
 ```
@@ -427,132 +428,83 @@ tool name.
 **Goal:** Understand what's in the case before doing anything.
 
 ```
-# Load
 setup_input_study('C:/studies/case')
 
-# Discover available types
+# Types with descriptions (once), then the ones that matter, in ONE call
 discover_objects()
-# → [..., 'ThermalPlant', 'HydroPlant', 'Bus', 'TransmissionLine', ...]
+discover_object_properties(['ThermalPlant', 'HydroPlant', 'Demand'], query='capacity')
+# → element counts, sample keys, property names
 
-# Discover all_objects available on the study 
-get_all_objects()
+# Totals per system, one call per type
+get_table('ThermalPlant', ['RefSystem', 'MaximumGenerationCapacity'], at='2027-01-01',
+          group_by=['RefSystem'], agg={'MaximumGenerationCapacity': 'sum', 'object': 'count'})
+get_table('HydroPlant', ['RefSystem', 'InstalledCapacity'], at='2027-01-01',
+          group_by=['RefSystem'], agg='sum')
 
-# Count and get keys for key types
-get_objects_by_type('ThermalPlant')   → Objects Keys: [...] . Total: 12 objects
-get_objects_by_type('HydroPlant')     → Objects Keys: [...] . Total: 8 objects
-get_objects_by_type('Bus')            → Objects Keys: [...] . Total: 45 objects
-
-# Get property table for each key type
-get_objects_table('ThermalPlant', ['InstalledCapacity', 'MinimumOutput', 'MarginalCost'])
-get_objects_table('HydroPlant',   ['InstalledCapacity', 'MaxPower'])
-
-# Present: summary table + top 3 highlights
-# e.g., largest plant, total thermal capacity, dominant fuel
+# Highlights: the 3 largest plants
+get_table('HydroPlant', ['InstalledCapacity'], at='2027-01-01', sort_by='InstalledCapacity', top=3)
 ```
 
 ---
 
 ### WF-2: Query a specific object's properties
 
-**Goal:** Find and read properties of "Gas1" thermal plant.
+**Goal:** Read the capacity, fuel and cost of "Gas1".
 
 ```
-# Step 1: discover types and get the exact key (first time only)
 setup_input_study('C:/studies/case')
-discover_objects()
-# → confirms 'ThermalPlant' is the right type
+discover_object_properties('ThermalPlant', query='capacity cost')
+# → sample keys ("Thermal Plant Gas1 [3]") and property names
 
-discover_object_properties('ThermalPlant')
-# → existing keys: "ThermalPlant Gas1 [3]", "ThermalPlant Coal1 [4]", ...
-#   InstalledCapacity: Static, unit MW
-#   MarginalCost: Dynamic
+# Static + dated in one call (merged automatically), the value in effect at a date
+get_table('ThermalPlant', ['RefFuel', 'MaximumGenerationCapacity', 'O&MCost'],
+          objects=['Thermal Plant Gas1 [3]'], at='2027-01-01')
 
-# Step 2: read static properties
-get_static_properties('ThermalPlant Gas1 [3]', ['InstalledCapacity', 'MinimumOutput'])
-
-# Step 3: read time-series
-input_get_dataframe('ThermalPlant Gas1 [3]', 'MarginalCost')
-
-# Step 4 (optional): aggregate by year
-input_aggregate_dataframe('ThermalPlant Gas1 [3]', 'MarginalCost', ['year'], 'mean')
+# Its evolution over a period (one row per stage)
+get_table('ThermalPlant', ['MaximumGenerationCapacity'], objects=['Thermal Plant Gas1 [3]'],
+          start='2027-01-01', end='2030-01-01')
 ```
 
-**Reuse:** The key `"ThermalPlant Gas1 [3]"` is now known. Skip
-`discover_objects` / `discover_object_properties` for this object in subsequent steps.
+**Reuse:** once the key is known, skip discovery for this object in later steps.
 
 ---
 
 ### WF-3: Filter and aggregate across all objects
 
-**Goal:** Find all thermal plants with capacity > 500 MW, count them, and sum their total — in one call.
+**Goal:** Thermal plants above 500 MW: the list, how many and the total — one call each.
 
 ```
-setup_input_study('C:/studies/case')
-
-discover_objects()
-# → confirms 'ThermalPlant' is the right type
-
-# Confirm property name
-discover_object_properties('ThermalPlant')
-# → property confirmed as 'InstalledCapacity' (Static, unit MW)
-
-# Get find + count + sum in a single call
-query_by_property_condition(
-    'ThermalPlant', 'InstalledCapacity', '>', 500,
-    actions=['find', 'count', 'sum']
-)
-# → Found (4): ThermalPlant BigGas [1]: 800, ...
-# → Count: 4
-# → Sum of 'InstalledCapacity': 3200 MW
+get_table('ThermalPlant', ['MaximumGenerationCapacity'], at='2027-01-01',
+          where=[['MaximumGenerationCapacity', '>', 500]], sort_by='MaximumGenerationCapacity')
+get_table('ThermalPlant', ['MaximumGenerationCapacity'], at='2027-01-01',
+          where=[['MaximumGenerationCapacity', '>', 500]],
+          agg={'MaximumGenerationCapacity': 'sum', 'object': 'count'})
+# → one row: total MW and count
 ```
 
 ---
 
-### WF-4: Filter by reference (fuel, system,etc)
-**1. Goal:** Find all thermal plants that use "Natural_Gas" and their total capacity.
+### WF-4: By reference (fuel, system) and joins
+
+**Goal:** Capacity by fuel; plants of one system; plants with their fuel price.
 
 ```
-setup_input_study('C:/studies/case')
-discover_objects()
-# → confirms 'ThermalPlant' is the right type
-discover_object_properties('ThermalPlant') -> Properties and keys
-discover_object_properties('Fuel')  -> Fuel properties and keys
+# Capacity by fuel, largest first
+get_table('ThermalPlant', ['RefFuel', 'MaximumGenerationCapacity'], at='2027-01-01',
+          group_by=['RefFuel'], agg='sum', sort_by='MaximumGenerationCapacity')
 
-# Get exact fuel name from objects table
-get_objects_table('ThermalPlant', ['name', 'RefFuel'])
+# Hydros of one system (reference columns hold keys: 'System SUL [2]'; 'contains' matches the name)
+get_table('HydroPlant', ['RefSystem', 'InstalledCapacity'], at='2027-01-01',
+          where=[['RefSystem', 'contains', 'SUL']], sort_by='InstalledCapacity')
 
-or 
+# Join the referenced Fuel's price (value in effect at the same date)
+get_table('ThermalPlant', ['RefFuel', 'MaximumGenerationCapacity'], at='2027-01-01',
+          join={'on': 'RefFuel', 'type': 'Fuel', 'properties': ['Price'], 'at': '2027-01-01'},
+          sort_by='RefFuel.Price', top=10)
 
-find_by_reference('ThermalPlant', 'RefFuel', 'Natural_Gas')
-# → [ThermalPlant Gas1 [3], ThermalPlant Gas2 [5], ...]
-
-# Sum capacity across these plants with specific fuel reference
-
-sum_property_by_reference('ThermalPlant', 'RefFuel', 'Natural_Gas', 'InstalledCapacity')
-# → 1800 MW
-```
-
-**2. Goal:** Find all hydro plants that belongs to "System 1" and their total capacity.
-
-```
-setup_input_study('C:/studies/case')
-discover_objects()
-# → confirms 'HydroPlant' is the right type
-discover_object_properties('HydroPlant') -> Properties and keys
-discover_object_properties('System')  -> System properties and keys
-
-# Get exact fuel name from objects table
-get_objects_table('HydroPlant', ['name', 'RefSystem'])
-
-or 
-
-find_by_reference('HydroPlant', 'RefSystem', 'System 1')
-# → [HydroPlant [3], HydroPlant [5], ...]
-
-# Sum capacity across these plants with specific fuel reference
-
-sum_property_by_reference('HydroPlant', 'RefSystem', 'System 1', 'InstalledCapacity')
-# → 1800 MW
+# Monthly demand per system in 2027
+get_table('Demand', ['RefSystem', 'EnergyPerBlock'], start='2027-01-01', end='2028-01-01',
+          group_by=['RefSystem', 'month'], agg='sum')
 ```
 
 ---
@@ -760,26 +712,23 @@ save_study('C:/studies/case_edited_20260429')
 
 ### WF-9: Scale a dynamic property by percentage
 
-**Goal:** Increase all thermal marginal costs by 5%.
+**Goal:** +5% on the O&M cost of every thermal plant from 2030 on.
 
 ```
 setup_edit_study('C:/studies/case', 'C:/studies/case_+5pct_cost')
+discover_object_properties('ThermalPlant', query='cost')
+# → 'O&MCost' is dynamic
 
-# Get all thermal keys
-get_objects_by_type('ThermalPlant')
-# → Objects Keys: ['ThermalPlant Gas1 [3]', 'ThermalPlant Coal1 [4]', ...]
+# ONE call for every plant (never scale_dataframe in a loop)
+edit_table('ThermalPlant', 'O&MCost', 'scale_percent', 5, start='2030-01-01')
+# limit with objects=[keys], end='2031-01-01' (the original value comes back at end), scenarios, blocks
 
-# Confirm MarginalCost is dynamic
-discover_object_properties('ThermalPlant')
-# → MarginalCost: Dynamic ✓
-
-# Scale each plant
-scale_dataframe('ThermalPlant Gas1 [3]',  'MarginalCost', 5)
-scale_dataframe('ThermalPlant Coal1 [4]', 'MarginalCost', 5)
-# ... repeat for all keys from get_objects_by_type
-
+# check, then save
+get_table('ThermalPlant', ['O&MCost'], objects=['Thermal Plant Gas1 [3]'], start='2029-01-01', end='2031-01-01')
 save_study('C:/studies/case_+5pct_cost')
 ```
+
+`scale_dataframe(key, prop, pct)` is for ONE element; `set_table` writes specific rows.
 
 ---
 
@@ -880,28 +829,12 @@ convert_output('C:/studies/case/gerter.dat', 'csv')
 ```
 # ── Phase 1: Explore ─────────────────────────────────────────────────────────
 setup_input_study('C:/studies/case')
-
-discover_objects()
-# → confirms 'HydroPlant' is the right type
-
-get_objects_by_type('HydroPlant')   → 8 objects, keys listed
-get_objects_table('HydroPlant', ['InstalledCapacity', 'MaxPower'])
-# Shows: all hydro plants, MaxPower in MW
-
-discover_object_properties('HydroPlant')
-# Confirms: MaxPower is Static, unit MW
-# Keys: ['HydroPlant Itaipu [1]', 'HydroPlant Furnas [2]', ...]
+discover_object_properties('HydroPlant', query='capacity')
+get_table('HydroPlant', ['InstalledCapacity'], at='2027-01-01', sort_by='InstalledCapacity')
 
 # ── Phase 2: Edit ─────────────────────────────────────────────────────────────
 setup_edit_study('C:/studies/case', 'C:/studies/case_+10pct_hydro')
-
-discover_object_properties('HydroPlant')
-# Confirms keys and property name (MaxPower: Static)
-
-modify_static_element('HydroPlant Itaipu [1]', 'MaxPower', 7800)
-modify_static_element('HydroPlant Furnas [2]', 'MaxPower', 1350)
-# ... all plants from the earlier get_objects_by_type result
-
+edit_table('HydroPlant', 'InstalledCapacity', 'scale_percent', 10)   # every plant, one call
 save_study('C:/studies/case_+10pct_hydro')
 
 # ── Phase 3: Run ──────────────────────────────────────────────────────────────
