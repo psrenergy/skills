@@ -34,14 +34,45 @@ The general pattern for any user request is:
 Do NOT call any other tool before the setup call completes successfully.
 
 **Step 2 — Discover object names (required before working with any object):**
-- Call `discover_objects()` (no study needed, always safe) → get the full list of type names.
-- Then call `discover_object_properties("TypeName")` for each type you need → get properties + object keys + binary files.
+- Call `discover_objects()` (no study needed, always safe) → type names, each with a one-line description. Use `query='reservoir'` to narrow it.
+- Then call `discover_object_properties("TypeName")` for each type you need → properties (unit, static/dynamic, key columns), references, and — with a study — element count, sample keys, tables and binary files. Use `query='fuel cost'` to filter a big type.
+- `list_tables("TypeName")` shows which properties are read together by `get_table`.
 - For outputs questions: call `list_enabled_outputs_paths()` or `list_enabled_outputs()` instead.
 - For run questions: call `list_available_versions('sddp')` instead.
 
 **Step 3 — Execute the goal using the keys and property names obtained above.**
+Questions about MANY elements (rankings, totals, counts, min/max, averages, "by fuel", "per system",
+"per month", "plants with X > Y") are ONE `get_table` call with its query options — see §0-A. Do not
+write code for them.
 
 ---
+
+## 0-A. Queries over many elements — `get_table`, never a script
+
+The usual question is answered in **2–3 calls**:
+1. `discover_object_properties(["ThermalPlant", "Fuel"], query="capacity")` — one call for every type
+   involved: exact property names, static/dynamic, references.
+2. `get_table(type, [properties], ...)` with the options the question needs, in this order:
+   read (`objects`, `start`/`end`, `scenarios`, `blocks`, `at`, `expand`) → `join` → `where` →
+   `group_by` + `agg` → `sort_by` + `top`.
+3. Answer from the (already small) result.
+
+Keep `identifier="key"` (default): reference columns (`RefFuel`, `RefSystem`) hold keys, so grouping and
+joins are exact. Use `at` for "current"/"largest"/"capacity of" (the value in effect, one row per element).
+
+| Question | One call |
+|---|---|
+| 5 largest hydros | `get_table("HydroPlant", ["InstalledCapacity"], at="2027-01-01", sort_by="InstalledCapacity", top=5)` |
+| Thermal capacity by fuel | `get_table("ThermalPlant", ["RefFuel", "MaximumGenerationCapacity"], at="2027-01-01", group_by=["RefFuel"], agg="sum", sort_by="MaximumGenerationCapacity")` |
+| How many thermals per system | `get_table("ThermalPlant", ["RefSystem"], group_by=["RefSystem"], agg="count")` |
+| Thermals of SUL above 100 MW | `get_table("ThermalPlant", ["RefSystem", "MaximumGenerationCapacity"], at="2027-01-01", where=[["RefSystem", "contains", "SUL"], ["MaximumGenerationCapacity", ">", 100]])` |
+| Monthly demand per system in 2027 | `get_table("Demand", ["RefSystem", "EnergyPerBlock"], start="2027-01-01", end="2028-01-01", group_by=["RefSystem", "month"], agg="sum")` |
+| Thermals with their fuel price | `get_table("ThermalPlant", ["RefFuel", "MaximumGenerationCapacity"], at="2027-01-01", join={"on": "RefFuel", "type": "Fuel", "properties": ["Price"], "at": "2027-01-01"})` → column `RefFuel.Price` |
+| Max / min / mean of a property | `get_table(type, [prop], at=..., agg="max")` (no group_by: one row) |
+| Several statistics | `agg={"MaximumGenerationCapacity": "sum", "object": "count"}` |
+
+`where` operators: `> >= < <= == != in, not in, contains`; `year`, `month`, `quarter`, `day`, `hour` are
+derived from `date` for `where` and `group_by`. A script is only for what this cannot express (§0).
 
 ## 0. Tools first — scripts only for complex work
 
@@ -50,9 +81,13 @@ queries, edits, runs, output analysis. Do not write a script for anything a
 tool already does.
 
 Switch to a script **only** when the task needs logic the tools cannot express,
-for example: conditional edits over many objects, bulk creation/cloning with
+for example: conditional edits over many objects, joins across types, bulk creation/cloning with
 cross-references, time series computed from several properties, resampling,
 or custom manipulation of study files. In that case:
+
+0. **Call `table_schema_head(type, properties)`** for each type involved: it returns the
+   schema (columns, dtypes, key columns), the head rows and a ready `psr.factory` snippet
+   (`study.get_table` / `study.set_table`). Write the script from that, not from guesses.
 
 1. **Load the `writing-psr-factory-scripts` skill** (the PSR Factory skill,
    installed with `psr-factory skills`). Follow its API rules — do not guess
@@ -68,8 +103,10 @@ or custom manipulation of study files. In that case:
    check the result with `get_*` / `query_*` / `input_*` tools. Run the model
    with `run_psr_model` if requested.
 
-Decision rule: if one or a few tool calls can do it → tools. If you would need
-to loop with branching logic or the tool catalog has no equivalent → script.
+Decision rule: if one or a few tool calls can do it → tools. Filter, sum, count, min/max, mean, sort,
+top N and a join on one reference are `get_table` options (§0-A), NOT a script. Script only when you would
+need chained calculations (a cascade walk, a balance of several types, values computed row by row from
+several properties), conditional logic per element, or several joins across types.
 
 ---
 
@@ -112,12 +149,34 @@ get_all_objects()   # full map of all keys → use sparingly, can be large
 `discover_objects` or `discover_object_properties` again for the same type.
 
 
-**Special Obejct - Demand** When the user asks about Demand values or properties, note that these can be stored at DemandSegment Objects or at Binary files.
-Pocket rule: 
-- Block Demand: look for DemandSegment objects and their properties ("EnergyPerBlock)
-- Hourly demand: look for DemandSegment objects and their properties ("EnergyPerHour)
-- Hourly demand varying with scenarios: look for binary files in the discover_object_properties output.
+**Special Object - Demand** The demand values are read and edited **on the `Demand` element itself** — no
+`DemandSegment` / `RefSegments` lookup is needed any more. `get_table("Demand", [...])` returns them with
+`segment` and `block` columns:
+- Per block (energy): `get_table("Demand", ["RefSystem", "EnergyPerBlock"], start=, end=, blocks=[..])` → `object | date | segment | block | RefSystem | EnergyPerBlock`.
+  Group by `RefSystem` and month to get the demand per system (a system is the `Demand`'s `RefSystem`).
+- Hourly (power): `get_table("Demand", ["EnergyPerHour"], start=, end=)` (a day is a few hundredths of a second);
+  hourly by scenario: `EnergyPerHourlyScenario` (adds `scenario`).
+- Which one the case uses: the `Demand`'s `EnergyResolution` (0 = the study's setting, 1 hourly, 3 block, 5 hourly
+  scenario) and the study setting `DemandEnergy`; when unsure, say which property you read and why.
+- Edit: `edit_table("Demand", "EnergyPerBlock", "scale_percent", 10, objects=[demand_key], start=, end=)`.
+  Binary files (`input_*_binary_*`) hold only what is not a property.
 
+**Reading static + dynamic together.** A static property (a reference such as `RefFuel`, `RefSystem`) and a dated one
+(`MaximumGenerationCapacity`, `Price`) live in different tables, which Factory cannot read in one call. `get_table`
+reads each table separately and merges them on the shared keys (the static value repeats on every row), so
+`get_table("ThermalPlant", ["RefFuel", "RefSystem", "MaximumGenerationCapacity"], at="2027-01-01")` just works.
+Dated tables keyed differently (stage+block next to hour+segment) are read apart too and matched by the value in
+effect at each date; keys only one side has multiply the rows (24 hours × 3 blocks = 72). A `join` on dated
+properties without `at` gives each row the value in effect at its date. With `start`/`end` (or several dated
+tables) there is one row per stage, so a value that does not change inside the period still shows; without
+`at`, `start` or `end` a dated read returns the stored dates only. Use `at` (one row per element) for
+"the largest / the capacity of".
+
+**Chained questions** (inflow energy along a hydro cascade, balances adding generation, demand and exchanges): the cascade link is on `HydroStation` (`RefDownstreamStation`), not on `HydroPlant`; read what you need with `get_table`, then use `table_schema_head` and a script for the chained calculation instead of many tool calls.
+
+**Dates in tables.** Pass dates as text (`'2027-01-01'`); the tool converts them. A period edit
+(`start`/`end`) works on the value in effect at every stage and puts the original value back at `end`, so it does
+not run past the period. Rows are the dates the study stores; `expand=True` gives one per stage.
 
 **Special Object - Study**: When the user asks for settings parameters of the case (e.g. discount rate, number of scenarios, time horizon), you can find its properties with "discover_properties("Study") to discover details you can use get_static_properties and get_dynamic_property as usual. Use `modify_study_setting` to edit these parameters directly by name.
 
@@ -139,8 +198,9 @@ Pocket rule:
 
 | Tool | Purpose | Combine with |
 |------|---------|-------------|
-| `discover_objects()` | List all available type names (no study needed) | Always first when unsure of type |
-| `discover_object_properties(type)` | Full property schema + keys + binary files for a known type | After discover_objects |
+| `discover_objects(query?)` | Type names with one-line descriptions (no study needed) | Always first when unsure of type |
+| `discover_object_properties(type, query?)` | Description, properties (unit, static/dynamic, key columns), references, who references the type; with a study: keys, tables, binary files | After discover_objects |
+| `list_tables(type)` | Tables of a type (static, by_stage, by_stage_block, by_hour, by_window…), key columns and properties | discover_object_properties |
 | `get_objects_by_type(type)` | All object keys + count for a type | discover_objects |
 | `get_all_objects()` | Full catalog (key → type map) | Use sparingly |
 | `get_object_summary(key)` | All statics + references for one object | get_neighbors |
@@ -155,6 +215,8 @@ Pocket rule:
 | `get_objects_table(type, props)` | Table for all objects of a type | Best for comparisons |
 
 ### 2D. Filter & Aggregate tools
+
+Prefer `get_table` with `where` / `group_by` / `agg` (§0-A): it covers these and works on dated data too.
 
 | Tool | Purpose | Returns |
 |------|---------|---------|
@@ -176,7 +238,22 @@ Pass `actions=['find', 'count', 'sum']` to get all three results in a single cal
 | `input_filter_dataframe_by_value(key, prop, conditions, binary)` | Keep rows meeting conditions |
 
 **Prefer filtered/aggregated reads** over `input_get_dataframe` for large time-series.
-These tools read from the **loaded input study** via `obj_key + property`.
+These tools read from the **loaded input study** via `obj_key + property`; the index
+carries real `date` plus `year`/`month` (monthly) or `year`/`week` (weekly) levels.
+
+### 2E-2. Long-table tools (fast — all elements of a type at once)
+
+Factory ≥ b187 reads one property of **every** element in one call, as a long table
+`object | date | date_end | scenario | block | <dimensions> | values`. Use these instead of
+looping `input_get_dataframe` / `get_static_properties` over many elements, and for any
+large case.
+
+| Tool | Purpose |
+|------|---------|
+| `get_table(type, props, objects?, start?, end?, scenarios?, blocks?, at?, expand?, join?, where?, group_by?, agg?, sort_by?, descending?, top?, max_rows?)` | Read + filter + join + aggregate + rank all elements in one call (§0-A). Static + dated properties are merged automatically |
+| `table_schema_head(type, props, head_rows?)` | Schema + head + script snippet, for complex requests (see §0) |
+
+`get_objects_table` is also one long-table read now (static properties).
 
 ### 2F. Input Binary file tools
 
@@ -205,7 +282,9 @@ at the bottom of the result. Never guess `.BIN` names. Requires `setup_input_stu
 | `modify_element_key(key, new_key)` | Change object key string | — |
 | `get_dataframe_schema(key, prop)` | Inspect shape before editing | — |
 | `set_dataframe(key, df_dict)` | Replace full DataFrame | get_dataframe_schema first |
-| `scale_dataframe(key, prop, pct)` | Scale all values by % | — |
+| `scale_dataframe(key, prop, pct)` | Scale all values of ONE element by % | — |
+| `edit_table(type, prop, 'set'/'add'/'scale_percent', value, objects?, start?, end?, scenarios?, blocks?)` | Change one property of MANY elements in one call (fast) | list_tables |
+| `set_table(type, rows, replace?)` | Write long-table rows back (merge, or replace whole series) | get_table |
 | `clear_dataframe(key, prop, date=None)` | Drop all entries of a dynamic property, or only the one at `date` | — |
 | `remove_elements(keys, cascade=False)` | Remove objects; refused while required references exist | — |
 | `replace_references(old_key, new_key)` | Re-point every reference to `old_key` onto `new_key` | Both objects exist |
@@ -223,8 +302,9 @@ Never use `cascade=True` without telling the user which objects were also remove
 Demand's segments) are removed with it automatically.
 
 **Static vs dynamic — how to tell:** call `discover_object_properties`. Look for
-`"Static (does not vary with time)"` → use `modify_static_element`.
-Look for `"Dynamic (varies with time)"` → use `get_dataframe_schema` then `set_dataframe` or `scale_dataframe`.
+`static` → use `modify_static_element` (one element) or `edit_table` (many).
+Look for `dynamic` → one element: `get_dataframe_schema` then `set_dataframe` or `scale_dataframe`;
+many elements: `edit_table` (bulk) or `get_table` + `set_table` (specific rows).
 
 ### 2H. Output file tools
 
